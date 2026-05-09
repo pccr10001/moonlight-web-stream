@@ -14,6 +14,11 @@ if (errorListElement) {
 let alertedErrorListNotFound = false
 
 export function showErrorPopup(message: string, fatal: boolean = false, errorObject?: any) {
+    if (!message.trim()) {
+        console.debug("Suppressed empty error popup", errorObject)
+        return
+    }
+
     console.error(message, errorObject)
 
     if (!errorListElement) {
@@ -39,16 +44,42 @@ export function showErrorPopup(message: string, fatal: boolean = false, errorObj
     }, ERROR_REMOVAL_TIME_MS)
 }
 
-// TODO: wtf am i doing here? why fatal = that?
 function handleError(event: ErrorEvent) {
-    const fatal = event instanceof FetchError
+    const message = errorMessage(event.error, event.message)
+    if (!message) {
+        console.debug("Suppressed empty error event", event)
+        return
+    }
 
-    showErrorPopup(`${event.error}`, fatal, event)
+    showErrorPopup(message, event.error instanceof FetchError, event)
 }
 function handleRejection(event: PromiseRejectionEvent) {
-    const fatal = event instanceof FetchError
+    const message = errorMessage(event.reason)
+    if (!message) {
+        console.debug("Suppressed empty promise rejection", event)
+        return
+    }
 
-    showErrorPopup(`${event.reason}`, fatal, event)
+    showErrorPopup(message, event.reason instanceof FetchError, event)
+}
+
+function errorMessage(value: unknown, fallback?: string): string | null {
+    if (value instanceof Error && value.message.trim()) {
+        return value.message
+    }
+    if (typeof value == "string" && value.trim()) {
+        return value
+    }
+    if (value != null) {
+        const message = `${value}`
+        if (message.trim() && message != "[object Object]") {
+            return message
+        }
+    }
+    if (fallback?.trim()) {
+        return fallback
+    }
+    return null
 }
 
 window.addEventListener("error", handleError)
